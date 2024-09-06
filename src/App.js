@@ -1,18 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import styled, { keyframes, createGlobalStyle } from "styled-components";
-
-// Add this Global Style component
-const GlobalStyle = createGlobalStyle`
-  body {
-    margin: 0;
-    padding: 0;
-    background-color: black;
-  }
-
-  * {
-    user-select: none;
-  }
-`;
+import styled, { keyframes } from "styled-components";
 
 const Page = styled.div`
   position: relative;
@@ -25,7 +12,7 @@ const Page = styled.div`
   user-select: none;
 `;
 
-const CameraContainer = styled.div`
+const Camera = styled.div`
   flex: 1;
   width: 100%;
   position: relative;
@@ -54,7 +41,7 @@ const Canvas = styled.canvas`
   display: none;
 `;
 
-const ControlsContainer = styled.div`
+const Controls = styled.div`
   position: absolute;
   height: 8rem;
   display: flex;
@@ -117,11 +104,11 @@ function App() {
   const velocityRef = useRef({ scale: 0, x: 0, y: 0 });
   const [isCameraFrozen, setIsCameraFrozen] = useState(false);
   const [capturedImage, setCapturedImage] = useState(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   const startCamera = async () => {
     try {
       if (videoRef.current && videoRef.current.srcObject) {
-        // Stop all tracks of the existing stream
         videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       }
 
@@ -134,37 +121,17 @@ function App() {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      console.error("Error accessing camera:", err);
+      console.error("Error: ", err);
     }
   };
 
   useEffect(() => {
     startCamera();
-
-    // Add or update the theme-color meta tag
-    let themeColorMeta = document.querySelector('meta[name="theme-color"]');
-    if (!themeColorMeta) {
-      themeColorMeta = document.createElement("meta");
-      themeColorMeta.name = "theme-color";
-      document.head.appendChild(themeColorMeta);
-    }
-    themeColorMeta.setAttribute("content", "#000000");
-
-    // Add viewport meta tag to prevent scaling and ensure full height
-    let viewportMeta = document.querySelector('meta[name="viewport"]');
-    if (!viewportMeta) {
-      viewportMeta = document.createElement("meta");
-      viewportMeta.name = "viewport";
-      document.head.appendChild(viewportMeta);
-    }
-    viewportMeta.setAttribute(
-      "content",
-      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    );
   }, []);
 
   const takePhotoAndSend = async () => {
     if (videoRef.current && canvasRef.current) {
+      setIsCapturing(true);
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
@@ -192,8 +159,7 @@ function App() {
       const imageData = canvas.toDataURL("image/jpeg");
       setCapturedImage(imageData);
       setIsCameraFrozen(true);
-
-      // Immediately send the image to the server
+      setIsCapturing(false);
       await sendImageToServer(imageData);
     }
   };
@@ -204,6 +170,7 @@ function App() {
     }
 
     setIsLoading(true);
+
     try {
       const base64Data = imageData.split(",")[1];
       const response = await fetch(
@@ -222,17 +189,17 @@ function App() {
 
         if (result && result.timeAndDateFound) {
           downloadICSFile(result.calendarFileData);
-          resetCamera(); // Reset camera after successful download
+          resetCamera();
         } else {
           alert("No parking sign found in the image!");
           resetCamera();
         }
       } else {
-        console.error("Server error:", response.statusText);
+        console.error("Error: ", response.statusText);
         resetCamera();
       }
     } catch (error) {
-      console.error("Error sending image to server:", error);
+      console.error("Error: ", error);
       resetCamera();
     } finally {
       setIsLoading(false);
@@ -245,8 +212,10 @@ function App() {
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, -5);
     link.href = url;
-    link.download = "reminder.ics";
+    link.download = `reminder_${timestamp}.ics`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -263,7 +232,6 @@ function App() {
     translateXRef.current = 0;
     translateYRef.current = 0;
 
-    // Restart the camera
     try {
       if (videoRef.current && videoRef.current.srcObject) {
         videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
@@ -278,7 +246,7 @@ function App() {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
-      console.error("Error restarting camera:", err);
+      console.error("Error: ", err);
     }
   };
 
@@ -299,15 +267,11 @@ function App() {
       const distance = getDistance(e.touches[0], e.touches[1]);
       const newScale = scaleRef.current * (distance / initialDistance);
       const clampedScale = Math.min(Math.max(newScale, 1), 3);
-
-      // Calculate the change in scale
       const scaleDiff = clampedScale - scaleRef.current;
 
-      // Update the scale
       scaleRef.current = clampedScale;
       setScale(clampedScale);
 
-      // Recenter the image when zooming out
       if (scaleDiff < 0) {
         const newTranslateX = 0;
         const newTranslateY = 0;
@@ -379,38 +343,37 @@ function App() {
   };
 
   return (
-    <>
-      <GlobalStyle />
-      <Page>
-        <CameraContainer
-          ref={containerRef}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          {capturedImage ? (
-            <Image src={capturedImage} alt="Captured" />
-          ) : (
-            <Video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              style={{
-                transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
-              }}
-            />
-          )}
-          <Canvas ref={canvasRef} />
-        </CameraContainer>
-        <ControlsContainer>
-          {isLoading || isCameraFrozen ? (
-            <Spinner />
-          ) : (
-            <Button onClick={takePhotoAndSend}>Scan</Button>
-          )}
-        </ControlsContainer>
-      </Page>
-    </>
+    <Page>
+      <Camera
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {capturedImage ? (
+          <Image src={capturedImage} alt="Captured" />
+        ) : (
+          <Video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            style={{
+              transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
+              opacity: isCapturing ? 0 : 1,
+              transition: "opacity 0.2s ease-out",
+            }}
+          />
+        )}
+        <Canvas ref={canvasRef} />
+      </Camera>
+      <Controls>
+        {isLoading || isCameraFrozen || isCapturing ? (
+          <Spinner />
+        ) : (
+          <Button onClick={takePhotoAndSend}>Scan</Button>
+        )}
+      </Controls>
+    </Page>
   );
 }
 
