@@ -199,7 +199,9 @@ function App() {
 
         if (result && result.timeAndDateFound) {
           downloadICSFile(result.calendarFileData);
-          resetCamera();
+          setTimeout(() => {
+            resetCamera();
+          }, 2000);
         } else {
           alert("No parking sign found in the image!");
           resetCamera();
