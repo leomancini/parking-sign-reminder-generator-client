@@ -6,7 +6,7 @@ const Page = styled.div`
   height: 100dvh;
   width: 100vw;
   overflow: hidden;
-  background-color: black;
+  background-color: #000;
   display: flex;
   flex-direction: column;
   user-select: none;
@@ -20,6 +20,8 @@ const Camera = styled.div`
   touch-action: none;
   border-radius: 2rem 2rem 0 0;
   background-color: rgba(255, 255, 255, 0.2);
+  opacity: ${(props) => props.opacity};
+  transition: opacity 0.25s ease-in-out;
 `;
 
 const Video = styled.video`
@@ -27,7 +29,7 @@ const Video = styled.video`
   height: 100%;
   object-fit: cover;
   transform-origin: center;
-  transition: transform 0.1s ease-out;
+  z-index: 1;
 `;
 
 const Image = styled.img`
@@ -35,6 +37,8 @@ const Image = styled.img`
   height: 100%;
   object-fit: cover;
   transform-origin: center;
+  z-index: 2;
+  position: absolute;
 `;
 
 const Canvas = styled.canvas`
@@ -93,6 +97,7 @@ function App() {
   const containerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [scale, setScale] = useState(3);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const [translateX, setTranslateX] = useState(0);
   const [translateY, setTranslateY] = useState(0);
   const scaleRef = useRef(3);
@@ -117,9 +122,14 @@ function App() {
           facingMode: { exact: "environment" },
         },
       });
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+
+      setTimeout(() => {
+        setIsCameraReady(true);
+      }, 500);
     } catch (err) {
       console.error("Error: ", err);
     }
@@ -130,8 +140,8 @@ function App() {
   }, []);
 
   const takePhotoAndSend = async () => {
+    setIsCapturing(true);
     if (videoRef.current && canvasRef.current) {
-      setIsCapturing(true);
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
@@ -349,21 +359,18 @@ function App() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        opacity={isCameraReady ? (capturedImage ? 0.5 : 1) : 0}
       >
-        {capturedImage ? (
-          <Image src={capturedImage} alt="Captured" />
-        ) : (
-          <Video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            style={{
-              transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
-              opacity: isCapturing ? 0 : 1,
-              transition: "opacity 0.2s ease-out",
-            }}
-          />
-        )}
+        {capturedImage && <Image src={capturedImage} alt="Captured" />}
+        <Video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          style={{
+            transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
+            opacity: isCapturing ? 0 : 1,
+          }}
+        />
         <Canvas ref={canvasRef} />
       </Camera>
       <Controls>
