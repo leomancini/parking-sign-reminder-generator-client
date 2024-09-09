@@ -96,11 +96,12 @@ function App() {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [scale, setScale] = useState(3);
+  const [hasTelephotoCamera, setHasTelephotoCamera] = useState(false);
+  const [scale, setScale] = useState(hasTelephotoCamera ? 1 : 3);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [translateX, setTranslateX] = useState(0);
   const [translateY, setTranslateY] = useState(0);
-  const scaleRef = useRef(3);
+  const scaleRef = useRef(hasTelephotoCamera ? 1 : 3);
   const translateXRef = useRef(0);
   const translateYRef = useRef(0);
   const [initialDistance, setInitialDistance] = useState(null);
@@ -123,8 +124,25 @@ function App() {
         },
       });
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const availableDevices = await navigator.mediaDevices.enumerateDevices();
+
+      const telephotoCamera = availableDevices.filter(
+        (device) => device.label === "Back Telephoto Camera"
+      )[0];
+
+      if (telephotoCamera) {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: telephotoCamera.deviceId } },
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream;
+        }
+        setHasTelephotoCamera(true);
+      } else {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setHasTelephotoCamera(false);
       }
 
       setTimeout(() => {
@@ -237,10 +255,10 @@ function App() {
   const resetCamera = async () => {
     setIsCameraFrozen(false);
     setCapturedImage(null);
-    setScale(3);
+    setScale(hasTelephotoCamera ? 1 : 3);
     setTranslateX(0);
     setTranslateY(0);
-    scaleRef.current = 3;
+    scaleRef.current = hasTelephotoCamera ? 1 : 3;
     translateXRef.current = 0;
     translateYRef.current = 0;
 
@@ -254,8 +272,26 @@ function App() {
           facingMode: { exact: "environment" },
         },
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+
+      const availableDevices = await navigator.mediaDevices.enumerateDevices();
+
+      const telephotoCamera = availableDevices.filter(
+        (device) => device.label === "Back Telephoto Camera"
+      )[0];
+
+      if (telephotoCamera) {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: telephotoCamera.deviceId } },
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream;
+        }
+        setHasTelephotoCamera(true);
+      } else {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setHasTelephotoCamera(false);
       }
     } catch (err) {
       console.error("Error: ", err);
